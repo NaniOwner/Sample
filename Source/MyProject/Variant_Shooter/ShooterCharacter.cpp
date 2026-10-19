@@ -155,9 +155,15 @@ float AShooterCharacter::TakeDamage(float Damage, struct FDamageEvent const& Dam
 
 	// update the HUD
 	OnRep_CurrentHP();
+	ClientNotifyDamage(GetHealthPercent());
 	ForceNetUpdate();
 
 	return AppliedDamage;
+}
+
+void AShooterCharacter::ClientNotifyDamage_Implementation(float LifePercent)
+{
+	OnHitTaken.Broadcast(LifePercent);
 }
 
 void AShooterCharacter::DoAim(float Yaw, float Pitch)

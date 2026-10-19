@@ -12,6 +12,10 @@
 #include "Components/Widget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Image.h"
+#include "Components/Border.h"
+#include "Components/SphereComponent.h"
+#include "Components/ProgressBar.h"
+#include "Widgets/SWidget.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInterface.h"
 #include "Engine/Engine.h"
@@ -153,7 +157,21 @@ bool FShooterHealthFiringTest::RunTest(const FString& Parameters)
 	}
 	if (TestNotNull(TEXT("Health-powered weapon produces a projectile"), Shot))
 	{
+		Shot->DispatchBeginPlay();
 		AActor* ShotActor = Shot;
+		USphereComponent* ShotCollision = Shot->FindComponentByClass<USphereComponent>();
+		TestTrue(TEXT("Projectile ignores its shooter"), ShotCollision->GetMoveIgnoreActors().Contains(Shooter));
+		TestTrue(TEXT("Moving shooter ignores its projectile"), Shooter->GetCapsuleComponent()->GetMoveIgnoreActors().Contains(Shot));
+		Shot->SetActorLocation(FVector(150.0f, 0.0f, 0.0f));
+		FHitResult MovementHit;
+		Shooter->GetCapsuleComponent()->MoveComponent(FVector(300.0f, 0.0f, 0.0f), FQuat::Identity, true, &MovementHit);
+		TestTrue(TEXT("Shooter movement sweeps through its own live bullet"), Shooter->GetActorLocation().X > 290.0f);
+		TestFalse(TEXT("Moving shooter is not blocked by its own bullet"), MovementHit.GetActor() == Shot);
+		FHitResult SelfHit(Shooter, Shooter->GetCapsuleComponent(), Shooter->GetActorLocation(), -FVector::ForwardVector);
+		ShotActor->NotifyHit(nullptr, Shooter, Shooter->GetCapsuleComponent(), false,
+			SelfHit.ImpactPoint, SelfHit.ImpactNormal, FVector::ZeroVector, SelfHit);
+		TestEqual(TEXT("Self hit neither damages nor heals shooter"), Shooter->GetHealthPercent(), 395.0f / 500.0f);
+		TestTrue(TEXT("Self hit does not consume projectile collision"), ShotCollision->GetCollisionEnabled() != ECollisionEnabled::NoCollision);
 		FHitResult Hit(Victim, Victim->GetCapsuleComponent(), Victim->GetActorLocation(), -FVector::ForwardVector);
 		ShotActor->NotifyHit(nullptr, Victim, Victim->GetCapsuleComponent(), true,
 			Hit.ImpactPoint, Hit.ImpactNormal, FVector::ZeroVector, Hit);
@@ -164,6 +182,7 @@ bool FShooterHealthFiringTest::RunTest(const FString& Parameters)
 				Hit.ImpactPoint, Hit.ImpactNormal, FVector::ZeroVector, Hit);
 			TestEqual(TEXT("Duplicate impact cannot heal twice"), Shooter->GetHealthPercent(), 402.0f / 500.0f);
 		}
+		TestFalse(TEXT("Impacted bullet is removed from shooter's movement ignores"), Shooter->GetCapsuleComponent()->GetMoveIgnoreActors().Contains(Shot));
 	}
 	Shooter->RestoreHealth(100000.0f);
 	TestEqual(TEXT("Healing is capped at maximum health"), Shooter->GetHealthPercent(), 1.0f);
@@ -175,7 +194,7 @@ bool FShooterHealthFiringTest::RunTest(const FString& Parameters)
 
 	UShooterBulletCounterUI* HUD = NewObject<UShooterBulletCounterUI>(World, HUDClass);
 	HUD->Initialize();
-	HUD->TakeWidget();
+	TSharedRef<SWidget> HUDWidget = HUD->TakeWidget();
 	UWidget* AmmoDisplay = nullptr;
 	TArray<UWidget*> Widgets;
 	HUD->WidgetTree->GetAllWidgets(Widgets);
@@ -198,6 +217,38 @@ bool FShooterHealthFiringTest::RunTest(const FString& Parameters)
 	if (TestNotNull(TEXT("Existing health bar is retained"), LifeBar))
 	{
 		TestTrue(TEXT("Health bar remains visible"), LifeBar->GetVisibility() != ESlateVisibility::Collapsed);
+	}
+	UWidget* DamageBorder = HUD->GetWidgetFromName(TEXT("DamageOverlay"));
+	if (TestNotNull(TEXT("Existing damage border is retained"), DamageBorder))
+	{
+		HUD->ResetHealthPresentation(1.0f);
+		TestEqual(TEXT("Full health has no persistent border"), DamageBorder->GetRenderOpacity(), 0.0f);
+		HUD->UpdateHealth(0.8f);
+		TestEqual(TEXT("Health spending does not flash the border immediately"), DamageBorder->GetRenderOpacity(), 0.0f);
+		for (int32 Frame = 0; Frame < 60; ++Frame)
+		{
+			HUDWidget->Tick(FGeometry(), Frame / 60.0, 1.0f / 60.0f);
+		}
+		const float HealthyOpacity = DamageBorder->GetRenderOpacity();
+		TestTrue(TEXT("Health loss gradually raises persistent redness"), HealthyOpacity > 0.0f && HealthyOpacity < 0.03f);
+		HUD->UpdateHealth(0.1f);
+		TestEqual(TEXT("Health bar updates immediately"), CastChecked<UProgressBar>(LifeBar)->GetPercent(), 0.1f);
+		for (int32 Frame = 0; Frame < 120; ++Frame)
+		{
+			HUDWidget->Tick(FGeometry(), Frame / 60.0, 1.0f / 60.0f);
+		}
+		const float LowHealthOpacity = DamageBorder->GetRenderOpacity();
+		TestTrue(TEXT("Low health border is stronger"), LowHealthOpacity > 0.5f);
+		UImage* EdgeImage = Cast<UImage>(HUD->GetWidgetFromName(TEXT("Image_1")));
+		if (TestNotNull(TEXT("Existing border edge is retained"), EdgeImage))
+		{
+			TestTrue(TEXT("Low health edge turns deep red"), EdgeImage->GetColorAndOpacity().G < 0.1f);
+		}
+		HUD->PlayDamageEffect();
+		HUDWidget->Tick(FGeometry(), 0.0, 1.0f / 60.0f);
+		TestTrue(TEXT("Actual damage adds a hit pulse"), DamageBorder->GetRenderOpacity() > LowHealthOpacity);
+		HUD->ResetHealthPresentation(1.0f);
+		TestEqual(TEXT("Respawn clears the border and hit pulse"), DamageBorder->GetRenderOpacity(), 0.0f);
 	}
 	return true;
 }

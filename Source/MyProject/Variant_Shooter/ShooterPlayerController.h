@@ -94,6 +94,9 @@ protected:
 	UFUNCTION()
 	void OnPawnDamaged(float LifePercent);
 
+	UFUNCTION()
+	void OnPawnHit(float LifePercent);
+
 	/** Returns true if the player should use UMG touch controls */
 	bool ShouldUseTouchControls() const;
 

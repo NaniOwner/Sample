@@ -18,10 +18,12 @@ public class MyProject : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
+			"OnlineSubsystem",
+			"OnlineSubsystemUtils",
 			"Slate"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "SlateCore" });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"MyProject",

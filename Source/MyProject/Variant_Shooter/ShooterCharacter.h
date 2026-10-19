@@ -90,6 +90,10 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerSwitchWeapon();
 
+	/** Only actual incoming damage triggers the owning player's hit presentation. */
+	UFUNCTION(Client, Reliable)
+	void ClientNotifyDamage(float LifePercent);
+
 	void ApplyDeathPresentation();
 
 	/** Team ID for this character*/
@@ -123,6 +127,8 @@ public:
 
 	/** Damaged delegate */
 	FDamagedDelegate OnDamaged;
+
+	FDamagedDelegate OnHitTaken;
 
 public:
 

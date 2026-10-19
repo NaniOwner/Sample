@@ -16,6 +16,11 @@
 void AShooterPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	if (IsLocalController())
+	{
+		SetInputMode(FInputModeGameOnly());
+		bShowMouseCursor = false;
+	}
 }
 
 void AShooterPlayerController::SetupInputComponent()
@@ -112,12 +117,18 @@ void AShooterPlayerController::BindPawnHUD()
 	{
 		HUDCharacter->OnBulletCountUpdated.RemoveDynamic(this, &AShooterPlayerController::OnBulletCountUpdated);
 		HUDCharacter->OnDamaged.RemoveDynamic(this, &AShooterPlayerController::OnPawnDamaged);
+		HUDCharacter->OnHitTaken.RemoveDynamic(this, &AShooterPlayerController::OnPawnHit);
 	}
 	HUDCharacter = Cast<AShooterCharacter>(GetPawn());
 	if (IsValid(HUDCharacter))
 	{
 		HUDCharacter->OnBulletCountUpdated.AddUniqueDynamic(this, &AShooterPlayerController::OnBulletCountUpdated);
 		HUDCharacter->OnDamaged.AddUniqueDynamic(this, &AShooterPlayerController::OnPawnDamaged);
+		HUDCharacter->OnHitTaken.AddUniqueDynamic(this, &AShooterPlayerController::OnPawnHit);
+		if (IsValid(BulletCounterUI))
+		{
+			BulletCounterUI->ResetHealthPresentation(HUDCharacter->GetHealthPercent());
+		}
 		OnPawnDamaged(HUDCharacter->GetHealthPercent());
 		HUDCharacter->RefreshWeaponHUD();
 	}
@@ -177,7 +188,16 @@ void AShooterPlayerController::OnPawnDamaged(float LifePercent)
 {
 	if (IsValid(BulletCounterUI))
 	{
-		BulletCounterUI->BP_Damaged(LifePercent);
+		BulletCounterUI->UpdateHealth(LifePercent);
+	}
+}
+
+void AShooterPlayerController::OnPawnHit(float LifePercent)
+{
+	if (IsValid(BulletCounterUI))
+	{
+		BulletCounterUI->UpdateHealth(LifePercent);
+		BulletCounterUI->PlayDamageEffect();
 	}
 }
 

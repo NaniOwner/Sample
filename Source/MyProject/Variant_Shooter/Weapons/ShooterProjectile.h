@@ -71,6 +71,12 @@ protected:
 	float HitHealthRestore = 0.0f;
 	bool bGrantedHitHealing = false;
 
+	/** Reverse ignores prevent the moving shooter from sweeping into its own shot. */
+	TArray<TWeakObjectPtr<UPrimitiveComponent>> ShooterCollisionComponents;
+	bool IsShooterActor(const AActor* Actor) const;
+	void InitializeShooterCollision();
+	void ClearShooterCollision();
+
 	/** How long to wait after a hit before destroying this projectile */
 	UPROPERTY(EditAnywhere, Category="Projectile|Destruction", meta = (ClampMin = 0, ClampMax = 10, Units = "s"))
 	float DeferredDestructionTime = 5.0f;
@@ -85,6 +91,8 @@ public:
 
 protected:
 	
+	virtual void PostInitializeComponents() override;
+
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
 

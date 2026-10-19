@@ -39,8 +39,45 @@ AShooterProjectile::AShooterProjectile()
 	HitDamageType = UDamageType::StaticClass();
 }
 
+bool AShooterProjectile::IsShooterActor(const AActor* Actor) const
+{
+	return Actor && (Actor == GetInstigator() || Actor == GetOwner() ||
+		(GetInstigator() && Actor->IsOwnedBy(GetInstigator())));
+}
+
+void AShooterProjectile::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	InitializeShooterCollision();
+}
+
+void AShooterProjectile::InitializeShooterCollision()
+{
+	TArray<AActor*> IgnoredActors;
+	if (GetInstigator())
+	{
+		IgnoredActors.AddUnique(GetInstigator());
+		GetInstigator()->GetAttachedActors(IgnoredActors, false, true);
+	}
+	if (GetOwner())
+	{
+		IgnoredActors.AddUnique(GetOwner());
+	}
+	for (AActor* Actor : IgnoredActors)
+	{
+		CollisionComponent->IgnoreActorWhenMoving(Actor, true);
+		TInlineComponentArray<UPrimitiveComponent*> Components(Actor);
+		for (UPrimitiveComponent* Component : Components)
+		{
+			Component->IgnoreActorWhenMoving(this, true);
+			ShooterCollisionComponents.AddUnique(Component);
+		}
+	}
+}
+
 void AShooterProjectile::BeginPlay()
 {
+	InitializeShooterCollision();
 	Super::BeginPlay();
 	
 	// ignore the pawn that shot this projectile
@@ -53,8 +90,21 @@ void AShooterProjectile::BeginPlay()
 	}
 }
 
+void AShooterProjectile::ClearShooterCollision()
+{
+	for (const TWeakObjectPtr<UPrimitiveComponent>& Component : ShooterCollisionComponents)
+	{
+		if (Component.IsValid())
+		{
+			Component->IgnoreActorWhenMoving(this, false);
+		}
+	}
+	ShooterCollisionComponents.Empty();
+}
+
 void AShooterProjectile::EndPlay(EEndPlayReason::Type EndPlayReason)
 {
+	ClearShooterCollision();
 	Super::EndPlay(EndPlayReason);
 
 	// clear the destruction timer
@@ -64,7 +114,7 @@ void AShooterProjectile::EndPlay(EEndPlayReason::Type EndPlayReason)
 void AShooterProjectile::NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit)
 {
 	// ignore if we've already hit something else
-	if (!HasAuthority() || bHit)
+	if (!HasAuthority() || bHit || IsShooterActor(Other))
 	{
 		return;
 	}
@@ -73,6 +123,7 @@ void AShooterProjectile::NotifyHit(class UPrimitiveComponent* MyComp, AActor* Ot
 
 	// disable collision on the projectile
 	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ClearShooterCollision();
 
 	// make AI perception noise
 	MakeNoise(NoiseLoudness, GetInstigator(), GetActorLocation(), NoiseRange, NoiseTag);
@@ -162,7 +213,7 @@ void AShooterProjectile::ProcessHit(AActor* HitActor, UPrimitiveComponent* HitCo
 	if (ACharacter* HitCharacter = Cast<ACharacter>(HitActor))
 	{
 		// ignore the owner of this projectile
-		if (HitCharacter != GetOwner() || bDamageOwner)
+		if (!IsShooterActor(HitCharacter) || bDamageOwner)
 		{
 			// apply damage to the character
 			const float AppliedDamage = UGameplayStatics::ApplyDamage(HitCharacter, HitDamage, GetInstigatorController(), this, HitDamageType);
