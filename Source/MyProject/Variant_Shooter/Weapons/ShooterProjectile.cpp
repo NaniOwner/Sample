@@ -48,6 +48,13 @@ bool AShooterProjectile::IsShooterActor(const AActor* Actor) const
 void AShooterProjectile::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
+	// Apply after Blueprint defaults so every projectile ignores other projectiles.
+	TInlineComponentArray<UPrimitiveComponent*> ProjectileComponents(this);
+	for (UPrimitiveComponent* Component : ProjectileComponents)
+	{
+		Component->SetCollisionObjectType(ECC_GameTraceChannel1);
+		Component->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Ignore);
+	}
 	InitializeShooterCollision();
 }
 
@@ -114,7 +121,7 @@ void AShooterProjectile::EndPlay(EEndPlayReason::Type EndPlayReason)
 void AShooterProjectile::NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit)
 {
 	// ignore if we've already hit something else
-	if (!HasAuthority() || bHit || IsShooterActor(Other))
+	if (!HasAuthority() || bHit || IsShooterActor(Other) || Cast<AShooterProjectile>(Other))
 	{
 		return;
 	}

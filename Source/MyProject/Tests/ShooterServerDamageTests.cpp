@@ -253,4 +253,48 @@ bool FShooterHealthFiringTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShooterProjectileCollisionTest,
+	"MyProject.Multiplayer.ProjectileCollision",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FShooterProjectileCollisionTest::RunTest(const FString& Parameters)
+{
+	UClass* BulletClass = LoadClass<AShooterProjectile>(nullptr,
+		TEXT("/Game/Variant_Shooter/Blueprints/Pickups/Projectiles/BP_ShooterProjectile_Bullet.BP_ShooterProjectile_Bullet_C"));
+	if (!TestNotNull(TEXT("Existing bullet Blueprint loads"), BulletClass))
+	{
+		return false;
+	}
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	ON_SCOPE_EXIT { World->DestroyWorld(false); };
+	// Run the normal actor initialization path, including Blueprint component setup.
+	World->InitializeActorsForPlay(FURL());
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AShooterProjectile* First = World->SpawnActor<AShooterProjectile>(BulletClass, FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	AShooterProjectile* Second = World->SpawnActor<AShooterProjectile>(BulletClass, FVector(100, 0, 0), FRotator::ZeroRotator, Params);
+	if (!TestNotNull(TEXT("First bullet spawns"), First) || !TestNotNull(TEXT("Second bullet spawns"), Second))
+	{
+		return false;
+	}
+	FHitResult Hit;
+	First->SetActorLocation(FVector(200, 0, 0), true, &Hit);
+	TestFalse(TEXT("Movement sweep passes through another bullet"), Hit.bBlockingHit);
+	TestEqual(TEXT("Bullet reaches the other side"), First->GetActorLocation().X, 200.0);
+
+	AActor* Wall = World->SpawnActor<AActor>();
+	USphereComponent* WallCollision = NewObject<USphereComponent>(Wall);
+	Wall->SetRootComponent(WallCollision);
+	WallCollision->SetSphereRadius(40);
+	WallCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	WallCollision->SetCollisionObjectType(ECC_WorldStatic);
+	WallCollision->SetCollisionResponseToAllChannels(ECR_Block);
+	WallCollision->RegisterComponent();
+	Wall->SetActorLocation(FVector(400, 0, 0));
+	First->SetActorLocation(FVector(600, 0, 0), true, &Hit);
+	TestTrue(TEXT("Movement sweep still collides with world geometry"), Hit.bBlockingHit);
+	TestEqual(TEXT("World blocker is the hit actor"), Hit.GetActor(), Wall);
+	return true;
+}
+
 #endif

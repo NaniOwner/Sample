@@ -140,6 +140,7 @@ public:
 	float GetHealthPercent() const;
 	bool CanSpendHealthForShot() const;
 	bool TrySpendHealthForShot();
+	UFUNCTION(BlueprintCallable, Category="Health")
 	float RestoreHealth(float Amount);
 	float GetHitHealthRestore() const { return HitHealthRestore; }
 	void RefreshWeaponHUD();

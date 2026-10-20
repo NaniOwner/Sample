@@ -17,6 +17,29 @@ UCLASS(abstract)
 class MYPROJECT_API AShooterGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
+
+public:
+	AShooterGameMode();
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category="Health Pack")
+	TSubclassOf<AActor> HealthPackClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="Health Pack", meta=(ClampMin="0.1", Units="s"))
+	float HealthPackRespawnDelay = 5.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Health Pack", meta=(ClampMin="100", Units="cm"))
+	float HealthPackSpawnRadius = 2000.0f;
+
+	FTimerHandle HealthPackCheckTimer;
+	FTimerHandle HealthPackRespawnTimer;
+	void CheckHealthPacks();
+	void SpawnHealthPack();
+	bool HasHealthPack() const;
+	bool FindHealthPackFloor(FVector& OutLocation) const;
+
+	UFUNCTION()
+	void OnHealthPackDestroyed(AActor* DestroyedActor);
 	
 protected:
 
@@ -43,6 +66,7 @@ protected:
 
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** Assigns a PlayerStart to a specific player */
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
