@@ -57,7 +57,7 @@ protected:
 
 	/** Health spent per successful shot. Firing never consumes the last health point. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Health|Combat", meta=(ClampMin="0.0"))
-	float ShotHealthCost = 5.0f;
+	float ShotHealthCost = .0f;
 
 	/** Health restored once per projectile that damages another character. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Health|Combat", meta=(ClampMin="0.0"))
